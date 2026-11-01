@@ -2,7 +2,7 @@
 
 A pixel-art runner through the floors of Hogwarts. Dodge falling stone, jump spikes and Monster Books, slide under crows and trolls, and catch Golden Snitches to unlock new wizards. 50,000 procedurally generated levels, with a treasure chest waiting at the end of the map.
 
-**Play:** https://habmuz.github.io/hogwarts-dash/
+**Play:** https://habmuz.github.io/
 
 ## Controls
 | Key | Action |
