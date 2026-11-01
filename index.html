@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Hogwarts Dash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0916; --bg2: #171026; --gold: #ffd34d; --gold2: #b8892b; --ink: #f4ead2;
+    --muted: #9d8fb8; --red: #ff5a4a; --green: #7dff9a; --stone: #3a3346; --stone2: #4f4760;
+    --px: "Press Start 2P", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--px); overflow: hidden; -webkit-user-select: none; user-select: none; }
+  button { font-family: var(--px); cursor: pointer; }
+  .hidden { display: none !important; }
+  .spr { background-image: var(--atlas); background-repeat: no-repeat; image-rendering: pixelated; image-rendering: crisp-edges; }
+
+  /* ---------- home ---------- */
+  #home { position: fixed; inset: 0; display: flex; flex-direction: column;
+    background: radial-gradient(ellipse at 50% 0%, #2a1d48 0%, var(--bg) 60%); }
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: rgba(8,6,16,.85);
+    border-bottom: 3px solid var(--gold2); z-index: 5; }
+  .brand { font-size: 12px; color: var(--gold); text-shadow: 2px 2px 0 #000; flex: 1; letter-spacing: 1px; }
+  .coins { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--gold); background: #000a; padding: 6px 10px; border: 2px solid var(--gold2); }
+  .coins .ico { width: 18px; height: 12px; display: inline-block; }
+  .tb-btn { background: var(--stone); color: var(--ink); border: 2px solid var(--stone2); border-bottom-width: 4px; padding: 7px 10px; font-size: 9px; }
+  .tb-btn:active { transform: translateY(2px); border-bottom-width: 2px; }
+
+  #map { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; scrollbar-width: thin; scrollbar-color: var(--gold2) transparent; }
+  #mapInner { position: relative; max-width: 520px; margin: 0 auto; }
+  .hero { position: absolute; top: 0; left: 0; right: 0; height: 340px; text-align: center; padding-top: 34px; }
+  .hero h1 { margin: 0; font-size: 28px; line-height: 1.25; color: var(--gold); text-shadow: 3px 3px 0 #6b3d00, 6px 6px 0 #000; }
+  .hero p { margin: 14px 16px 0; font-size: 9px; color: var(--muted); line-height: 1.8; }
+  #heroArt { position: relative; height: 140px; margin-top: 10px; }
+  #heroAvatar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); animation: bob .5s steps(2) infinite; }
+  .hero-owl { position: absolute; left: 12%; top: 10px; animation: fly 3s ease-in-out infinite; }
+  .hero-snitch { position: absolute; right: 14%; top: 26px; animation: fly 1.6s ease-in-out infinite reverse; }
+  .hero .scroll-hint { font-size: 8px; color: var(--muted); animation: blink 1.2s steps(2) infinite; }
+  @keyframes bob { 50% { transform: translateX(-50%) translateY(-3px); } }
+  @keyframes fly { 50% { transform: translateY(-12px); } }
+  @keyframes blink { 50% { opacity: .3; } }
+
+  .group { position: absolute; left: 0; right: 0; }
+  .group .path { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+  .path path { fill: none; stroke-width: 8; stroke-linecap: round; }
+  .path .todo { stroke: #3b3350; stroke-dasharray: 2 12; }
+  .path .done { stroke: var(--gold2); stroke-dasharray: 2 12; filter: drop-shadow(0 0 4px #ffb40088); }
+  .plaque { position: absolute; top: 18px; left: 16px; max-width: 62%; background: linear-gradient(#5a3d1e, #3d2914); border: 3px solid var(--gold2);
+    padding: 10px 12px; box-shadow: 4px 4px 0 #000; z-index: 2; }
+  .plaque.right { left: auto; right: 16px; text-align: right; }
+  .plaque .ch { font-size: 8px; color: var(--gold); }
+  .plaque .tn { font-size: 10px; margin: 6px 0; color: #fff; }
+  .plaque .lv { font-size: 7px; color: #d8c49a; }
+  .plaque .st { color: var(--gold); }
+  .plaque.locked { filter: grayscale(.8) brightness(.6); }
+
+  .stone { position: absolute; width: 50px; height: 42px; margin: -21px 0 0 -25px; border: 0; padding: 0;
+    background: var(--stone); color: #8d84a3; font-size: 10px; z-index: 3;
+    box-shadow: inset 0 -6px 0 #241f2d, inset 0 3px 0 #5a5170, 0 0 0 3px #000; border-radius: 6px; transition: transform .1s; }
+  .stone .num { position: relative; top: -2px; }
+  .stone:hover { transform: scale(1.08); }
+  .stone.done { background: #c48b28; color: #fff6d8; box-shadow: inset 0 -6px 0 #7a5214, inset 0 3px 0 #ffd77a, 0 0 0 3px #000; }
+  .stone.current { background: #3fae5c; color: #fff; box-shadow: inset 0 -6px 0 #1f6b35, inset 0 3px 0 #8cf2a5, 0 0 0 3px #000, 0 0 22px #7dff9a;
+    animation: pulse 1s ease-in-out infinite; }
+  .stone.locked { cursor: not-allowed; }
+  .stone.chest { width: 60px; margin-left: -30px; }
+  .stone .stars { position: absolute; left: 50%; top: 44px; transform: translateX(-50%); font-size: 8px; color: var(--gold); white-space: nowrap; text-shadow: 1px 1px 0 #000; }
+  .stone .stars i { color: #3b3350; font-style: normal; }
+  .stone .mini-chest { position: absolute; left: 50%; top: -22px; transform: translateX(-50%); }
+  .stone.locked .mini-chest { filter: brightness(.55); }
+  .stone .avatar { position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%); animation: bob .5s steps(2) infinite; pointer-events: none; }
+  .stone.chest .avatar { bottom: 46px; }
+  .stone.shake { animation: shake .3s; }
+  @keyframes pulse { 50% { box-shadow: inset 0 -6px 0 #1f6b35, inset 0 3px 0 #8cf2a5, 0 0 0 3px #000, 0 0 36px #7dff9a; } }
+  @keyframes shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+  #treasure { position: absolute; left: 0; right: 0; height: 700px; text-align: center; padding-top: 40px; }
+  #treasure .tchest { display: inline-block; position: relative; margin-top: 30px; animation: fly 2.4s ease-in-out infinite; filter: drop-shadow(0 0 30px #ffcc33); }
+  #treasure h2 { font-size: 18px; color: var(--gold); text-shadow: 3px 3px 0 #000; margin: 30px 16px 10px; line-height: 1.5; }
+  #treasure p { font-size: 9px; color: var(--muted); line-height: 1.9; margin: 0 24px; }
+  #treasure .rays { position: absolute; left: 50%; top: 140px; width: 520px; height: 520px; margin-left: -260px; pointer-events: none;
+    background: repeating-conic-gradient(from 0deg, #ffd34d22 0 10deg, transparent 10deg 20deg);
+    mask-image: radial-gradient(circle, #000 20%, transparent 65%); -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 65%);
+    animation: spin 18s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .floatbar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 8px; padding: 12px 16px 18px;
+    background: linear-gradient(transparent, rgba(8,6,16,.95) 45%); pointer-events: none; z-index: 6; flex-wrap: wrap; }
+  .floatbar > * { pointer-events: auto; }
+  .btn { background: #3fae5c; color: #fff; border: 3px solid #000; box-shadow: inset 0 -5px 0 #1f6b35, inset 0 3px 0 #8cf2a5; padding: 13px 16px 15px; font-size: 11px; }
+  .btn:active { transform: translateY(2px); }
+  .btn.ghost { background: var(--stone); box-shadow: inset 0 -5px 0 #241f2d, inset 0 3px 0 #5a5170; }
+  .btn.gold { background: #c48b28; box-shadow: inset 0 -5px 0 #7a5214, inset 0 3px 0 #ffd77a; }
+  .btn.small { padding: 8px 10px 10px; font-size: 8px; }
+  .btn:disabled { opacity: .6; }
+
+  /* ---------- play ---------- */
+  #play { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; }
+  #stage { position: relative; touch-action: none; }
+  #game { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+  #pauseBtn { position: absolute; right: 0.6%; top: 0.6%; width: 5.2%; height: 5.6%; min-width: 26px; min-height: 22px;
+    background: rgba(0,0,0,.4); border: 2px solid var(--gold2); color: var(--gold); font-size: 9px; padding: 0; }
+
+  /* ---------- overlays ---------- */
+  #overlay { position: fixed; inset: 0; background: rgba(5,3,12,.72); display: flex; align-items: center; justify-content: center; z-index: 20; padding: 16px; }
+  #card { width: 100%; max-width: 440px; max-height: 100%; overflow-y: auto; background: linear-gradient(#2a1f3d, #191226); border: 4px solid var(--gold2);
+    box-shadow: 0 0 0 4px #000, 8px 8px 0 4px #000; padding: 22px 18px; text-align: center; animation: pop .25s ease-out; }
+  @keyframes pop { from { transform: scale(.8); opacity: 0; } }
+  .title { font-size: 15px; line-height: 1.5; margin-bottom: 10px; text-shadow: 2px 2px 0 #000; }
+  .gold { color: var(--gold); } .red { color: var(--red); }
+  .sub { font-size: 8px; color: var(--muted); line-height: 1.8; margin-bottom: 12px; }
+  .bigstars { font-size: 38px; margin: 6px 0 12px; }
+  .bigstars span { color: #5a5170; display: inline-block; text-shadow: 3px 3px 0 #000; }
+  .bigstars span.on { color: var(--gold); animation: starpop .45s both; }
+  @keyframes starpop { 0% { transform: scale(0) rotate(-40deg); } 70% { transform: scale(1.4); } 100% { transform: scale(1); } }
+  .row { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 9px; margin: 8px 0; }
+  .row b { color: var(--gold); }
+  .chestwin, .unlock { display: flex; align-items: center; gap: 12px; justify-content: center; font-size: 8px; line-height: 1.9; margin: 12px 0; padding: 10px;
+    background: #0006; border: 2px dashed var(--gold2); text-align: left; }
+  .unlock { border-color: var(--green); animation: glowb 1s ease-in-out infinite; }
+  .unlock b { color: var(--green); font-size: 11px; }
+  @keyframes glowb { 50% { box-shadow: 0 0 18px #7dff9a88; } }
+  .prog { margin: 14px 0 4px; }
+  .prog-label, .prog-note { font-size: 7px; color: var(--muted); margin-bottom: 6px; }
+  .prog-label b { color: var(--ink); }
+  .bar { height: 12px; background: #000; border: 2px solid var(--stone2); }
+  .bar div { height: 100%; background: linear-gradient(#ffe27a, #c48b28); }
+  .btns { display: flex; gap: 8px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 8px; margin: 16px 0; text-align: left; }
+  kbd { display: inline-block; min-width: 22px; padding: 4px; background: #f4e6b8; color: #3a2a14; border-bottom: 3px solid #7a6a4a; text-align: center; margin-right: 6px; font-family: var(--px); }
+  .skins { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+  .skin { background: var(--stone); border: 3px solid #000; padding: 8px 2px; color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 128px; justify-content: flex-end; }
+  .skin.on { background: #2e6b3e; border-color: var(--green); }
+  .skin.lockd .skin-ico { filter: brightness(0) drop-shadow(0 0 1px #6d6488); }
+  .skin .nm { font-size: 6px; }
+  .skin .cost { font-size: 6px; color: var(--gold); }
+  @media (max-width: 420px) { .skins { grid-template-columns: repeat(2, 1fr); } .hero h1 { font-size: 22px; } }
+
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
+  #confetti i { position: absolute; top: -10px; width: 6px; height: 6px; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(105vh) rotate(720deg); } }
+</style>
+</head>
+<body>
+<div id="home">
+  <div class="topbar">
+    <div class="brand">HOGWARTS DASH</div>
+    <div class="coins" title="Golden Snitches caught"><span class="ico" id="coinIco"></span><span id="coinCount">0</span></div>
+    <button class="tb-btn" id="shopBtn">WARDROBE</button>
+    <button class="tb-btn" id="muteBtn">🔊</button>
+  </div>
+  <div id="map">
+    <div id="mapInner">
+      <div class="hero">
+        <h1>HOGWARTS<br>DASH</h1>
+        <p>Run the castle floors. Dodge the falling stone.<br>Catch every Golden Snitch.</p>
+        <div id="heroArt"><div id="heroAvatar"></div></div>
+        <div class="scroll-hint">▼ 50,000 levels below · treasure at the end ▼</div>
+      </div>
+      <div id="treasure">
+        <div class="rays"></div>
+        <h2>THE LOST TREASURE<br>OF HOGWARTS</h2>
+        <p>Clear all 50,000 levels<br>to claim what lies within.</p>
+        <div class="tchest"></div>
+        <p style="margin-top:40px"><button class="btn ghost small" id="toTop">▲ Back to the start</button></p>
+      </div>
+    </div>
+  </div>
+  <div class="floatbar">
+    <button class="btn ghost small hidden" id="meBtn">◎ MY LEVEL</button>
+    <button class="btn" id="playBtn">▶ PLAY</button>
+    <button class="btn gold small" id="toTreasure">TREASURE ▼</button>
+  </div>
+</div>
+
+<div id="play" class="hidden">
+  <div id="stage">
+    <canvas id="game" width="640" height="360"></canvas>
+    <button id="pauseBtn" aria-label="Pause">II</button>
+  </div>
+</div>
+
+<div id="overlay" class="hidden"><div id="card"></div></div>
+<div id="confetti"></div>
+
+<script src="js/atlas.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+<script>
+  // coin icon in the top bar
+  HD.atlasImg.addEventListener('load', () => document.getElementById('coinIco').replaceWith(HD.spriteEl('snitch', 0, 0.36)));
+  if (HD.atlasImg.complete && HD.atlasImg.naturalWidth) document.getElementById('coinIco').replaceWith(HD.spriteEl('snitch', 0, 0.36));
+</script>
+</body>
+</html>
