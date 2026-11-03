@@ -15,10 +15,14 @@
   HD.atlasImg = img;
   const A = window.ATLAS;
 
-  let L = null, P = null, p = null, state = 'off', lives = 0, got = 0;
+  let L = null, P = null, p = null, state = 'off', lives = 0, got = 0, maxLives = 3, bonus = 0;
+  let LO = {}, pet = null, bolts = [], hedwigFlip = false;
   let camX = 0, camY = 0, shake = 0, gtime = 0, stateT = 0, freeze = null, deathReason = '';
   let particles = [], popups = [], skin = 'harry', raf = 0, last = 0;
-  const buf = { jump: -9, slide: -9, fwd: -9, back: -9 };
+  const buf = { jump: -9, slide: -9, fwd: -9, back: -9, spell: -9 };
+  const SPELL_CD = 8;
+  const fallT = () => FALLT * (LO.timeturner ? 1.35 : 1);
+  const dashCd = () => DASH_CD * (LO.timeturner ? 0.5 : 1);
   const BUF_T = 0.18;
   const now = () => performance.now() / 1000;
 
@@ -51,7 +55,7 @@
     g.addColorStop(0, color.replace('A', a)); g.addColorStop(1, color.replace('A', 0));
     ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
   }
-  HD.skinScale = (id) => Math.min(1, 60 / A[id][1][3]);
+  HD.skinScale = (id) => Math.min(1, 60 / A[id][A[id].length > 1 ? 1 : 0][3]);
 
   // ---------- patterns ----------
   const patCache = {};
@@ -102,9 +106,11 @@
   // ---------- game API ----------
   function start(n) {
     L = HD.genLevel(n); P = L.P;
-    lives = P.lives; got = 0;
+    LO = HD.loadout ? HD.loadout() : {};
+    maxLives = P.lives + (LO.scarf ? 1 : 0); lives = maxLives; got = 0; bonus = 0; bolts = [];
     skin = HD.save.skin;
-    p = { f: 0, u: 0, alt: 0, vy: 0, ground: true, slide: 0, dash: 0, dashCd: 0, climb: null, inv: 0, anim: 0, pendSlide: false, coyote: 0, scale: HD.skinScale(skin) };
+    p = { f: 0, u: 0, alt: 0, vy: 0, ground: true, slide: 0, dash: 0, dashCd: 0, climb: null, inv: 0, anim: 0, pendSlide: false, coyote: 0, scale: HD.skinScale(skin), shield: LO.hat ? 1 : 0, dobby: LO.pet === 'dobby' ? 1 : 0, spellCd: 0, dj: false };
+    pet = LO.pet ? { id: LO.pet, x: wx(L.floors[0], 0) - 30, y: gy(0), hop: 0 } : null;
     for (const k in buf) buf[k] = -9;
     particles = []; popups = []; freeze = null; shake = 0;
     state = 'intro'; stateT = 0; gtime = 0;
@@ -127,6 +133,7 @@
   function input(k) {
     if (!p || state === 'off' || state === 'paused') return;
     const t = now();
+    if (k === 'spell') { if (LO.spell) buf.spell = t; return; }
     if (k === 'up') buf.jump = t;
     else if (k === 'down') buf.slide = t;
     else {
@@ -158,6 +165,27 @@
 
   function die(reason) {
     if (state !== 'play' || (p.inv > 0 && reason !== 'wall' && reason !== 'fell')) return;
+    const fl0 = floorOf(p.f), px = wx(fl0, p.u), py = gy(p.f) - p.alt - 24;
+    if (p.shield > 0 && reason !== 'wall' && reason !== 'fell') {
+      p.shield--; p.inv = 1.3; shake = 6;
+      HD.audio.sfx.shield(); puff(px, py, 26, '#8fd3ff', 150, 0, 0.6, 2);
+      popup(px, py - 30, 'PROTEGO!', '#8fd3ff', 8);
+      return;
+    }
+    if (p.dobby > 0) {
+      p.dobby--; p.inv = 1.5; shake = 4;
+      HD.audio.sfx.snap(); puff(px, py, 30, '#f2e6c9', 120, 0, 0.7, 2);
+      popup(px, py - 30, 'DOBBY SAVES YOU!', '#ffe9b0', 8);
+      if (reason === 'wall') {
+        const nf = floorOf(p.f + 1);
+        p.climb = { t: 0, x0: px, y0: gy(p.f), x1: nf.xs, y1: gy(p.f + 1), dir: nf.dir };
+      } else if (reason === 'fell') {
+        const gp = fl0.obs.find((o) => o.type === 'gap' && Math.abs(p.u - o.u) < o.w);
+        if (gp) p.u = gp.u + gp.w / 2 + 14;
+        p.alt = 0; p.vy = 0; p.ground = true;
+      }
+      return;
+    }
     state = 'dead'; stateT = 0; deathReason = reason;
     lives--; shake = 12;
     if (reason === 'crushed') HD.audio.sfx.crash(); HD.audio.sfx.die();
@@ -169,10 +197,14 @@
     let cp = { f: 0, u: 0 };
     for (const c of L.cps) if (c.reached) cp = c;
     for (const fl of L.floors) if (fl.f >= cp.f) for (const o of fl.obs) {
-      o.u = o.u0; o.active = false; o.st = null; o.t = 0; o.landed = false;
+      o.u = o.u0; o.active = false; o.st = null; o.t = 0; o.landed = false; o.dead = false; o.howled = false;
     }
-    for (const sn of L.snitches) if (sn.got && !sn.banked) { sn.got = false; got--; }
-    Object.assign(p, { f: cp.f, u: cp.u, alt: 0, vy: 0, ground: true, slide: 0, dash: 0, dashCd: 0, climb: null, inv: 1.6, pendSlide: false });
+    for (const sn of L.snitches) {
+      if (sn.got && !sn.banked) { sn.got = false; got--; }
+      if (!sn.got) { sn.missed = false; if (sn.u0 !== undefined) { sn.u = sn.u0; sn.alt = sn.a0; } }
+    }
+    bolts = [];
+    Object.assign(p, { f: cp.f, u: cp.u, alt: 0, vy: 0, ground: true, slide: 0, dash: 0, dashCd: 0, climb: null, inv: 1.6, pendSlide: false, dj: false });
     for (const k in buf) buf[k] = -9;
     const fl = floorOf(p.f);
     camX = wx(fl, p.u) - (fl.dir > 0 ? 190 : W - 190); camY = gy(p.f) - GSY;
@@ -189,7 +221,7 @@
     if (state === 'dead') {
       if (stateT > 1.3) {
         if (lives > 0) respawn();
-        else { state = 'over'; HD.ui.onLevelEnd({ win: false, n: L.n, got, total: L.snitches.length }); }
+        else { state = 'over'; HD.ui.onLevelEnd({ win: false, n: L.n, got, bonus, total: L.snitches.length }); }
       }
       return;
     }
@@ -197,7 +229,7 @@
       if (stateT > 1.6 && !L.reported) {
         L.reported = true; state = 'over';
         const total = L.snitches.length, pct = got / total;
-        HD.ui.onLevelEnd({ win: true, n: L.n, got, total, stars: pct >= 0.9 ? 3 : pct >= 0.6 ? 2 : 1 });
+        HD.ui.onLevelEnd({ win: true, n: L.n, got, bonus, total, stars: pct >= 0.9 ? 3 : pct >= 0.6 ? 2 : 1 });
       }
       p.anim += dt; updateCam(dt); return;
     }
@@ -207,6 +239,8 @@
 
     p.inv = Math.max(0, p.inv - dt);
     p.dashCd = Math.max(0, p.dashCd - dt);
+    p.spellCd = Math.max(0, p.spellCd - dt);
+    updatePet(dt);
     p.dash = Math.max(0, p.dash - dt);
 
     // climbing the staircase to the next floor
@@ -224,13 +258,22 @@
 
     // actions
     if (fresh('fwd') && p.dashCd <= 0) {
-      consume('fwd'); p.dash = DASH_T; p.dashCd = DASH_CD; HD.audio.sfx.dash();
+      consume('fwd'); p.dash = DASH_T; p.dashCd = dashCd(); HD.audio.sfx.dash();
     }
     if (fresh('jump') && (p.ground || p.coyote > 0)) {
       consume('jump'); p.vy = JUMPV; p.ground = false; p.coyote = 0; p.slide = 0; p.pendSlide = false;
       HD.audio.sfx.jump();
       puff(wx(fl, p.u), gy(p.f), 5, '#b9a98c', 50, 100, 0.35);
+    } else if (fresh('jump') && LO.broom && !p.ground && !p.dj) {
+      consume('jump'); p.vy = JUMPV * 0.85; p.dj = true; p.slide = 0; p.pendSlide = false;
+      HD.audio.sfx.jump();
+      puff(wx(fl, p.u), gy(p.f) - p.alt, 10, '#d9b36a', 70, 60, 0.4);
     }
+    if (fresh('spell') && p.spellCd <= 0) {
+      consume('spell'); p.spellCd = SPELL_CD; HD.audio.sfx.spell();
+      bolts.push({ f: p.f, u: p.u + 14, start: p.u });
+    }
+    updateBolts(fl, dt);
     if (fresh('slide')) {
       consume('slide');
       if (p.ground) { p.slide = SLIDE_T; HD.audio.sfx.slide(); }
@@ -260,7 +303,7 @@
         if (overGap(fl, p.u)) {
           if (p.alt < -40) { die('fell'); return; }
         } else {
-          p.alt = 0; p.vy = 0; p.ground = true;
+          p.alt = 0; p.vy = 0; p.ground = true; p.dj = false;
           puff(wx(fl, p.u), gy(p.f), 4, '#b9a98c', 40, 80, 0.3);
           if (p.pendSlide) { p.pendSlide = false; p.slide = SLIDE_T; HD.audio.sfx.slide(); }
         }
@@ -284,11 +327,13 @@
     // obstacles
     const pr = pRect();
     for (const o of fl.obs) {
+      if (o.dead) continue;
       const T = TYPES[o.type];
       const dist = o.u - p.u;
       if (T.mv) {
         if (!o.active && dist < 560) o.active = true;
         if (o.active) o.u -= T.mv * dt;
+        if (o.type === 'wolf' && o.active && !o.howled) { o.howled = true; HD.audio.sfx.howl(); }
       }
       if (o.type === 'debris') {
         if (!o.st && dist < o.trig && dist > -20) {
@@ -298,11 +343,11 @@
         }
         if (o.st === 'fall') {
           o.t += dt;
-          if (o.t >= FALLT) {
+          if (o.t >= fallT()) {
             o.st = 'down'; shake = Math.max(shake, 5);
             puff(wx(fl, o.u), gy(p.f) - 4, 16, '#9b927f', 110, 300, 0.6, 2);
           }
-          const bot = (CEIL - 26) * (1 - Math.pow(Math.min(1, o.t / FALLT), 2));
+          const bot = (CEIL - 26) * (1 - Math.pow(Math.min(1, o.t / fallT()), 2));
           if (overlap(pr, [o.u - 14, o.u + 14, bot, bot + 26])) { die('crushed'); return; }
         }
         if (o.st === 'down' && overlap(pr, [o.u - 13, o.u + 13, 0, 20])) { die('rubble'); return; }
@@ -321,7 +366,25 @@
       if (overlap(pr, [o.u - T.w / 2, o.u + T.w / 2, T.a0, T.a1])) { die(o.type); return; }
     }
 
-    // snitches
+    // snitches (pets can pull them in or catch the ones you miss)
+    const magnet = LO.pet === 'crookshanks' ? 95 : LO.pet === 'scabbers' ? 48 : 0;
+    if (magnet || LO.pet === 'owl') for (const sn of L.snitches) {
+      if (sn.got || sn.f !== p.f) continue;
+      const du = sn.u - p.u;
+      if (magnet && du > -20 && du < magnet) {
+        if (sn.u0 === undefined) { sn.u0 = sn.u; sn.a0 = sn.alt; }
+        sn.u += (p.u - sn.u) * Math.min(1, dt * 9); sn.alt += (p.alt + 22 - sn.alt) * Math.min(1, dt * 9);
+      }
+      if (LO.pet === 'owl' && !sn.missed && du < -40) {
+        sn.missed = true; hedwigFlip = !hedwigFlip;
+        if (hedwigFlip) {
+          sn.got = true; got++; HD.audio.sfx.snitch();
+          const x = wx(fl, sn.u), y = gy(p.f) - sn.alt;
+          puff(x, y, 10, '#ffffff', 80, 0, 0.5, 2); popup(x, y - 12, 'HEDWIG!', '#ffffff', 6);
+          if (pet) pet.swoop = 0.6;
+        }
+      }
+    }
     for (const sn of L.snitches) {
       if (sn.got || sn.f !== p.f || Math.abs(sn.u - p.u) > 30) continue;
       const sa = sn.alt + Math.sin(gtime * 3 + sn.ph) * 3;
@@ -339,6 +402,7 @@
     for (const c of L.cps) {
       if (!c.reached && c.f === p.f && p.u >= c.u) {
         c.reached = true; c.t = 0;
+        if (LO.pet === 'toad') { bonus += 2; popup(wx(fl, c.u), gy(p.f) - 92, '+2 TREVOR', '#9be27a', 6); }
         for (const sn of L.snitches) if (sn.got) sn.banked = true;
         HD.audio.sfx.checkpoint();
         const x = wx(fl, c.u);
@@ -377,6 +441,54 @@
     const ty = (p.climb ? y + p.alt : gy(p.f)) - GSY;
     camX += (tx - camX) * Math.min(1, dt * (p.climb ? 4 : 7));
     camY += (ty - camY) * Math.min(1, dt * 6);
+  }
+
+  // ---------- spells & pets ----------
+  function updateBolts(fl, dt) {
+    for (const b of bolts) {
+      b.u += 640 * dt;
+      for (const o of fl.obs) {
+        if (o.dead || o.type === 'gap' || Math.abs(o.u - b.u) > 22) continue;
+        if (o.type === 'debris' && !o.st) continue; // nothing to hit until it falls
+        o.dead = true; b.done = true;
+        const x = wx(fl, o.u), y = gy(p.f) - 30;
+        HD.audio.sfx.crash(); shake = Math.max(shake, 4);
+        puff(x, y, 24, '#7dff9a', 140, 120, 0.7, 2);
+        popup(x, y - 26, 'STUPEFY!', '#7dff9a', 8);
+        break;
+      }
+      if (b.u - b.start > 520) b.done = true;
+    }
+    bolts = bolts.filter((b) => !b.done);
+  }
+  function drawBolts() {
+    for (const b of bolts) {
+      const fl = floorOf(b.f), x = wx(fl, b.u), y = gy(b.f) - 30;
+      glow(x, y, 24, 'rgba(110,255,150,A)', 0.5);
+      spr('spell', 0, x, y, fl.dir < 0, 0.8, 1, 0.5, 0.5);
+    }
+  }
+  function updatePet(dt) {
+    if (!pet) return;
+    const [x, y] = playerWorld();
+    const dir = p.climb ? p.climb.dir : floorOf(p.f).dir;
+    const fly = pet.id === 'owl';
+    const tx = x - dir * (fly ? 26 : 30), ty = fly ? y - 62 + Math.sin(gtime * 4) * 5 : (p.climb ? y : gy(p.f));
+    pet.x += (tx - pet.x) * Math.min(1, dt * 10);
+    pet.y += (ty - pet.y) * Math.min(1, dt * (fly ? 5 : 14));
+    pet.dir = dir;
+    pet.hop = (pet.hop + dt * 9) % (Math.PI * 2);
+    if (pet.swoop) pet.swoop = Math.max(0, pet.swoop - dt);
+  }
+  function drawPet(behind) {
+    if (!pet || state === 'off' || (state === 'over' && L.reported)) return;
+    if (behind !== (pet.id !== 'owl')) return;
+    const flip = pet.dir < 0;
+    const hop = pet.id === 'toad' ? Math.abs(Math.sin(pet.hop)) * 8 : (pet.id === 'owl' ? 0 : Math.abs(Math.sin(pet.hop * 1.4)) * 2);
+    const sw = pet.swoop ? Math.sin(pet.swoop * 10) * 6 : 0;
+    const frame = pet.id === 'toad' ? (hop > 4 ? 1 : 0) : 0;
+    const sc = pet.id === 'toad' ? 0.6 : 1;
+    spr(pet.id, frame, pet.x, pet.y - hop + sw, flip, sc);
   }
 
   // ---------- rendering ----------
@@ -525,6 +637,11 @@
         rect(x - 16, top, 32, 8, '#3d6450'); rect(x - 16, g - 8, 32, 8, '#3d6450');
         break;
       }
+      case 'darkmark': {
+        glow(x, g - 130, 50, 'rgba(90,255,140,A)', 0.22 + Math.sin(gtime * 2 + x) * 0.06);
+        spr('darkmark', 0, x, g - 130, false, 0.9, 0.75, 0.5, 0.5);
+        break;
+      }
       case 'serpent': {
         for (let i = 0; i < 70; i += 2) rect(x - 35 + i, g - 110 + Math.sin(i * 0.15) * 14, 3, 5, '#4fae6a');
         rect(x + 35, g - 112 + Math.sin(70 * 0.15) * 14, 8, 7, '#4fae6a'); rect(x + 40, g - 110 + Math.sin(70 * 0.15) * 14, 2, 2, '#ffe14d');
@@ -640,6 +757,12 @@
       case 'pillar': spr('pillar', 0, x, g + 1, false, 1); break;
       case 'pumpkin': glow(x, g - 12, 22, 'rgba(255,150,40,A)', 0.25); spr('pumpkin', 0, x, g + 1, false, 0.95); break;
       case 'book': spr('book', tAnim, x, g + 1, towards, 0.8); break;
+      case 'wolf': {
+        const lope = o.active ? Math.abs(Math.sin(gtime * 14)) * 5 : 0;
+        spr('wolf', 0, x, g + 1 - lope, towards, 1);
+        if (o.active && Math.random() < 0.3) puff(x + (towards ? 26 : -26), g - 2, 1, '#8d8577', 30, 50, 0.3);
+        break;
+      }
       case 'crow': spr('crow', Math.floor(gtime * 6), x, g - 30, towards, 0.66); break;
       case 'troll': spr('troll', Math.floor(gtime * 2.5), x, g + 1, towards, 1.22); break;
       case 'flybooks': {
@@ -662,7 +785,7 @@
       }
       case 'debris': {
         if (o.st === 'fall') {
-          const k = Math.min(1, o.t / FALLT);
+          const k = Math.min(1, o.t / fallT());
           const bot = (CEIL - 26) * (1 - k * k);
           ctx.fillStyle = `rgba(0,0,0,${0.2 + 0.5 * k})`;
           ctx.beginPath(); ctx.ellipse(x, g - 1, 8 + 12 * k, 3, 0, 0, Math.PI * 2); ctx.fill();
@@ -733,13 +856,25 @@
       ctx.rotate(-dir * 1.25);
       spr(skin, 2, 0, 0, flip, s * 0.92, 1, 0.5, 0.5);
       ctx.restore();
+      drawShield(x, y + 14);
       if (Math.random() < 0.5) particles.push({ x: x + dir * 8, y: y - 2, vx: -dir * 60, vy: -20, g: 80, life: 0.3, t: 0, c: '#b9a98c', s: 2 });
       return;
     }
-    const bob = p.ground && !p.climb && state === 'play' ? (Math.floor(p.anim * 10) % 2) : 0;
-    spr(skin, frame, x, y - bob, flip, s);
+    const single = A[skin].length === 1;
+    const bob = p.ground && !p.climb && state === 'play' ? (Math.floor(p.anim * 10) % 2) * (single ? 3 : 1) : 0;
+    if (single && state === 'play') {
+      ctx.save(); ctx.translate(Math.round(x), Math.round(y - bob));
+      ctx.rotate(dir * (0.06 + Math.sin(p.anim * 20) * 0.05));
+      spr(skin, 0, 0, 0, flip, s); ctx.restore();
+    } else spr(skin, frame, x, y - bob, flip, s);
+    drawShield(x, y);
   }
 
+  function drawShield(x, y) {
+    if (!(p.shield > 0) || state !== 'play') return;
+    ctx.strokeStyle = `rgba(143,211,255,${0.35 + Math.sin(gtime * 5) * 0.15})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(Math.round(x), Math.round(y - 26), 30, 0, Math.PI * 2); ctx.stroke();
+  }
   function drawHUD() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     rect(0, 0, W, 24, 'rgba(8,6,16,0.7)'); rect(0, 24, W, 1, 'rgba(255,211,77,0.35)');
@@ -758,13 +893,23 @@
     }
     rect(bx + bw - 2, by - 3, 4, 12, '#b48cff');
     spr(skin, 0, bx + bw * prog, by + 12, floorOf(p.f).dir < 0, 0.28);
-    // snitches
+    // snitch counter
     spr('snitch', Math.floor(gtime * 14), 448, 12, false, 0.38, 1, 0.5, 0.5);
     text(got + '/' + L.snitches.length, 464, 13, 8, '#ffd34d', 'left');
     // hearts
-    for (let i = 0; i < P.lives; i++) drawHeart(560 + i * 14 - (P.lives - 3) * 14, 7, i < lives);
+    for (let i = 0; i < maxLives; i++) drawHeart(560 + i * 14 - (maxLives - 3) * 14, 7, i < lives);
+    // defences
+    let ix = 70;
+    if (LO.hat) { spr('hat', 0, ix + 8, H - 6, false, 0.42, p.shield > 0 ? 1 : 0.25); ix += 22; }
+    if (LO.pet === 'dobby') { spr('dobby', 0, ix + 6, H - 6, false, 0.55, p.dobby > 0 ? 1 : 0.25); ix += 18; }
+    if (LO.spell) {
+      const sk = 1 - p.spellCd / SPELL_CD;
+      rect(ix + 4, H - 16, 52, 8, 'rgba(0,0,0,0.5)');
+      rect(ix + 5, H - 15, 50 * sk, 6, sk >= 1 ? '#7dff9a' : '#3f7a4c');
+      text('SPELL [E]', ix + 30, H - 24, 6, sk >= 1 ? '#7dff9a' : '#8a7f99', 'center');
+    }
     // dash meter
-    const dk = 1 - p.dashCd / DASH_CD;
+    const dk = 1 - p.dashCd / dashCd();
     rect(8, H - 16, 52, 8, 'rgba(0,0,0,0.5)');
     rect(9, H - 15, 50 * dk, 6, dk >= 1 ? '#ffe27a' : '#8a7340');
     text('DASH', 34, H - 24, 6, dk >= 1 ? '#ffe27a' : '#8a7f99', 'center');
@@ -852,12 +997,15 @@
     for (const fl of vis) { drawTurnSign(fl); if (fl.last) drawFinish(fl); }
     for (const c of L.cps) if (c.f >= fmin && c.f <= fmax) drawFlag(c);
     for (const fl of vis) for (const o of fl.obs) {
-      if (o.type === 'gap') continue;
+      if (o.type === 'gap' || o.dead) continue;
       const x = wx(fl, o.u);
       if (x > cx - 100 && x < cx + W + 100) drawObstacle(fl, o);
     }
     for (const sn of L.snitches) if (sn.f >= fmin && sn.f <= fmax) drawSnitch(floorOf(sn.f), sn);
+    drawPet(true);
     drawPlayer();
+    drawPet(false);
+    drawBolts();
     for (const q of particles) rect(q.x, q.y, q.s, q.s, q.c);
     for (const q of popups) {
       ctx.globalAlpha = 1 - Math.max(0, q.life - 0.6) * 2;

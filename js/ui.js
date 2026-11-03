@@ -5,25 +5,64 @@
   const $ = (s) => document.querySelector(s);
   const SAVE_KEY = 'hogwartsDash.v1';
 
+  // Wizards unlock by lifetime snitches caught (never spent).
   HD.SKINS = [
-    { id: 'harry', name: 'Harry', need: 0 },
-    { id: 'hermione', name: 'Hermione', need: 60 },
-    { id: 'ron', name: 'Ron', need: 180 },
-    { id: 'draco', name: 'Draco', need: 400 },
-    { id: 'hagrid', name: 'Hagrid', need: 800 },
-    { id: 'snape', name: 'Snape', need: 1400 },
-    { id: 'dumbledore', name: 'Dumbledore', need: 2400 },
-    { id: 'voldemort', name: 'Voldemort', need: 4000 },
+    { id: 'harry', name: 'Harry', need: 0, house: 'Hogwarts' },
+    { id: 'hermione', name: 'Hermione', need: 60, house: 'Hogwarts' },
+    { id: 'ron', name: 'Ron', need: 180, house: 'Weasleys' },
+    { id: 'ginny', name: 'Ginny', need: 300, house: 'Weasleys' },
+    { id: 'fred', name: 'Fred', need: 450, house: 'Weasleys' },
+    { id: 'george', name: 'George', need: 600, house: 'Weasleys' },
+    { id: 'draco', name: 'Draco', need: 800, house: 'Hogwarts' },
+    { id: 'percy', name: 'Percy', need: 1000, house: 'Weasleys' },
+    { id: 'molly', name: 'Molly', need: 1250, house: 'Weasleys' },
+    { id: 'arthur', name: 'Arthur', need: 1500, house: 'Weasleys' },
+    { id: 'bill', name: 'Bill', need: 1800, house: 'Weasleys' },
+    { id: 'hagrid', name: 'Hagrid', need: 2100, house: 'Hogwarts' },
+    { id: 'lupin', name: 'Lupin', need: 2500, house: 'Hogwarts' },
+    { id: 'snape', name: 'Snape', need: 3000, house: 'Hogwarts' },
+    { id: 'narcissa', name: 'Narcissa', need: 3500, house: 'Death Eaters' },
+    { id: 'lucius', name: 'Lucius', need: 4100, house: 'Death Eaters' },
+    { id: 'barty', name: 'Barty Crouch Jr', need: 4800, house: 'Death Eaters' },
+    { id: 'deatheater', name: 'Masked Death Eater', need: 5500, house: 'Death Eaters' },
+    { id: 'snatcher', name: 'Hooded Death Eater', need: 6300, house: 'Death Eaters' },
+    { id: 'bellatrix', name: 'Bellatrix', need: 7200, house: 'Death Eaters' },
+    { id: 'dumbledore', name: 'Dumbledore', need: 8500, house: 'Hogwarts' },
+    { id: 'voldemort', name: 'Voldemort', need: 10000, house: 'Death Eaters' },
+  ];
+  // Accessories and pets are bought with the snitch wallet.
+  HD.ITEMS = [
+    { id: 'hat', spr: 'hat', name: 'Sorting Hat', cost: 150, desc: 'Protego shield: blocks one hit every level' },
+    { id: 'scarf', spr: 'scarf', name: 'Weasley Scarf', cost: 350, desc: '+1 heart every level' },
+    { id: 'pouch', spr: 'pouch', name: 'Gringotts Pouch', cost: 450, desc: '+25% snitches when a level ends' },
+    { id: 'timeturner', spr: 'timeturner', name: 'Time-Turner', cost: 750, desc: 'Falling stone drops slower, dash recharges 2× faster' },
+    { id: 'broom', spr: 'broom', name: 'Nimbus Broom', cost: 1100, desc: 'Double jump: press UP again in mid-air' },
+    { id: 'spell', spr: 'spell', name: 'Stupefy Wand', cost: 1600, desc: 'Press E (or SPELL) to blast the next obstacle. 8s recharge' },
+  ];
+  HD.PETS = [
+    { id: 'toad', name: 'Trevor', cost: 120, desc: '+2 snitches at every checkpoint' },
+    { id: 'scabbers', name: 'Scabbers', cost: 300, desc: 'Sniffs out snitches: small magnet' },
+    { id: 'crookshanks', name: 'Crookshanks', cost: 600, desc: 'Pounces on snitches: big magnet' },
+    { id: 'owl', name: 'Hedwig', cost: 1000, desc: 'Swoops for half the snitches you miss' },
+    { id: 'dobby', name: 'Dobby', cost: 1800, desc: 'Once per level, snaps his fingers and saves you from death' },
   ];
 
-  function defaults() { return { unlocked: 1, coins: 0, skin: 'harry', stars: {}, chests: {}, muted: false, seen: {} }; }
+  function defaults() { return { unlocked: 1, coins: 0, wallet: 0, skin: 'harry', stars: {}, chests: {}, muted: false, seen: {}, items: {}, itemOff: {}, pets: {}, pet: null }; }
   function load() {
-    try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) return Object.assign(defaults(), s); } catch (e) { /* storage unavailable */ }
+    try {
+      const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+      if (s) { if (s.wallet === undefined) s.wallet = s.coins || 0; return Object.assign(defaults(), s); }
+    } catch (e) { /* storage unavailable */ }
     return defaults();
   }
   function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(HD.save)); } catch (e) { /* storage unavailable */ } }
   HD.save = load();
   const owned = (s) => HD.save.coins >= s.need;
+  HD.loadout = () => {
+    const o = { pet: HD.save.pet && HD.save.pets[HD.save.pet] ? HD.save.pet : null };
+    for (const it of HD.ITEMS) o[it.id] = !!(HD.save.items[it.id] && !HD.save.itemOff[it.id]);
+    return o;
+  };
 
   // ---------- sprites as DOM elements ----------
   let AW = 1024, AH = 217;
@@ -155,7 +194,7 @@
   }
 
   function refreshHome() {
-    $('#coinCount').textContent = HD.save.coins.toLocaleString();
+    $('#coinCount').textContent = HD.save.wallet.toLocaleString();
     $('#muteBtn').textContent = HD.save.muted ? '🔇' : '🔊';
     const heroAv = $('#heroAvatar');
     heroAv.innerHTML = '';
@@ -182,6 +221,7 @@
     show('#play');
     fitCanvas();
     HD.game.start(n);
+    $('#spellBtn').classList.toggle('hidden', !HD.loadout().spell);
   }
 
   function fitCanvas() {
@@ -207,6 +247,7 @@
       else if (a === 'next') play(Math.min(HD.MAX_LEVEL, HD.game.level + 1));
       else if (a === 'resume') { hideOverlay(); HD.game.setPaused(false); }
       else if (a === 'close') hideOverlay();
+      else if (a === 'shop') goHome(), shop('items');
     }));
   }
   function hideOverlay() { ov.classList.add('hidden'); primary = secondary = null; }
@@ -225,7 +266,10 @@
   HD.ui = {
     onLevelEnd(r) {
       const before = HD.SKINS.filter(owned).map((s) => s.id);
-      HD.save.coins += r.got;
+      const lo = HD.loadout();
+      const pouch = lo.pouch ? Math.round(r.got * 0.25) : 0;
+      const earned = r.got + (r.bonus || 0) + pouch;
+      HD.save.coins += earned; HD.save.wallet += earned;
       let chestBonus = 0;
       const g = Math.floor((r.n - 1) / 10);
       if (r.win) {
@@ -233,7 +277,7 @@
         if (r.n === HD.save.unlocked) HD.save.unlocked = Math.min(HD.MAX_LEVEL, r.n + 1);
         if (r.n % 10 === 0 && !HD.save.chests[g]) {
           chestBonus = Math.min(400, 25 + g * 5);
-          HD.save.chests[g] = 1; HD.save.coins += chestBonus;
+          HD.save.chests[g] = 1; HD.save.coins += chestBonus; HD.save.wallet += chestBonus;
         }
       }
       const newly = HD.SKINS.filter((s) => owned(s) && !before.includes(s.id));
@@ -247,6 +291,9 @@
         h += `<div class="title red">OUT OF LIVES</div><div class="sub">You keep every snitch you caught.</div>`;
       }
       h += `<div class="row"><span class="snitch-ico"></span> Snitches caught <b>${r.got}/${r.total}</b></div>`;
+      if (r.bonus) h += `<div class="row">Trevor's checkpoint bonus <b>+${r.bonus}</b></div>`;
+      if (pouch) h += `<div class="row">Gringotts Pouch bonus <b>+${pouch}</b></div>`;
+      h += `<div class="row">Wallet <b>${HD.save.wallet.toLocaleString()}</b> · <a href="#" class="shoplink" data-act="shop">Visit the shop</a></div>`;
       if (chestBonus) h += `<div class="chestwin"><span class="chest-ico"></span><div>Chapter treasure opened!<br><b class="gold">+${chestBonus} snitches</b></div></div>`;
       for (const s of newly) h += `<div class="unlock"><span class="skin-ico" data-skin="${s.id}"></span><div>NEW WIZARD UNLOCKED<br><b>${s.name}</b></div><button class="btn small" data-equip="${s.id}">Wear</button></div>`;
       h += progressHTML();
@@ -268,24 +315,66 @@
     if (HD.game.state === 'off' || HD.game.state === 'over' || isOpen()) return;
     HD.game.setPaused(true);
     showOverlay(`<div class="title gold">PAUSED</div>
-      <div class="controls"><div><kbd>↑</kbd> Jump</div><div><kbd>↓</kbd> Slide</div><div><kbd>→</kbd> Dash forward</div><div><kbd>←</kbd> Turn at stairs</div></div>
+      <div class="controls"><div><kbd>↑</kbd> Jump</div><div><kbd>↓</kbd> Slide</div><div><kbd>→</kbd> Dash forward</div><div><kbd>←</kbd> Turn at stairs</div>${HD.loadout().spell ? '<div><kbd>E</kbd> Stupefy</div>' : ''}</div>
       <div class="btns"><button class="btn ghost" data-act="map">Map</button><button class="btn ghost" data-act="retry">Restart</button><button class="btn" data-act="resume">Resume</button></div>`,
     () => { hideOverlay(); HD.game.setPaused(false); }, goHome);
   }
 
-  function wardrobe() {
-    let h = `<div class="title gold">WARDROBE</div><div class="sub">Catch snitches to unlock new wizards · <b class="gold">${HD.save.coins.toLocaleString()}</b> caught</div><div class="skins">`;
-    for (const s of HD.SKINS) {
-      const has = owned(s), on = HD.save.skin === s.id;
-      h += `<button class="skin ${has ? '' : 'lockd'} ${on ? 'on' : ''}" data-skin="${s.id}" ${has ? '' : 'disabled'}>
-        <span class="skin-ico" data-skin="${s.id}"></span><span class="nm">${s.name}</span>
-        <span class="cost">${on ? 'WEARING' : has ? 'WEAR' : '🔒 ' + s.need.toLocaleString()}</span></button>`;
+  let shopTab = 'wizards';
+  function shop(tab) {
+    if (tab) shopTab = tab;
+    const S = HD.save;
+    const tabs = [['wizards', 'Wizards'], ['items', 'Accessories'], ['pets', 'Pets']]
+      .map(([k, n]) => `<button class="tab ${shopTab === k ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('');
+    let h = `<div class="title gold">SHOP</div><div class="tabs">${tabs}</div>`;
+    if (shopTab === 'wizards') {
+      h += `<div class="sub">Wizards unlock as your lifetime catch grows · <b class="gold">${S.coins.toLocaleString()}</b> caught</div>`;
+      for (const house of ['Hogwarts', 'Weasleys', 'Death Eaters']) {
+        h += `<div class="house">${house === 'Weasleys' ? 'The Weasley Family' : house}</div><div class="skins">`;
+        for (const sk of HD.SKINS.filter((x) => x.house === house)) {
+          const has = owned(sk), on = S.skin === sk.id;
+          h += `<button class="skin ${has ? '' : 'lockd'} ${on ? 'on' : ''}" data-skin="${sk.id}" ${has ? '' : 'disabled'}>
+            <span class="skin-ico" data-spr="${sk.id}" data-sc="1.2"></span><span class="nm">${sk.name}</span>
+            <span class="cost">${on ? 'WEARING' : has ? 'WEAR' : '🔒 ' + sk.need.toLocaleString()}</span></button>`;
+        }
+        h += `</div>`;
+      }
+      h += progressHTML();
+    } else {
+      const list = shopTab === 'items' ? HD.ITEMS : HD.PETS;
+      h += `<div class="sub">Spend snitches from your wallet · <b class="gold">${S.wallet.toLocaleString()}</b> to spend</div><div class="goods">`;
+      for (const it of list) {
+        const isPet = shopTab === 'pets';
+        const has = isPet ? S.pets[it.id] : S.items[it.id];
+        const on = isPet ? S.pet === it.id : has && !S.itemOff[it.id];
+        const afford = S.wallet >= it.cost;
+        const btn = !has ? `<button class="btn small ${afford ? 'gold' : 'ghost'}" data-buy="${it.id}" ${afford ? '' : 'disabled'}>BUY ${it.cost.toLocaleString()}</button>`
+          : `<button class="btn small ${on ? '' : 'ghost'}" data-toggle="${it.id}">${on ? (isPet ? 'WITH YOU' : 'ON') : (isPet ? 'TAKE' : 'OFF')}</button>`;
+        h += `<div class="good ${on ? 'on' : ''}"><span class="skin-ico" data-spr="${it.spr || it.id}" data-sc="${isPet ? 1.4 : 1.2}"></span>
+          <div class="gtxt"><b>${it.name}</b><span>${it.desc}</span></div>${btn}</div>`;
+      }
+      h += `</div>`;
     }
-    h += `</div>${progressHTML()}<div class="btns"><button class="btn" data-act="close">Done</button></div>`;
+    h += `<div class="btns"><button class="btn" data-act="close">Done</button></div>`;
     showOverlay(h, hideOverlay, hideOverlay);
-    card.querySelectorAll('.skin-ico').forEach((e) => e.appendChild(spriteEl(e.dataset.skin, 0, 1.3)));
+    card.querySelectorAll('.skin-ico').forEach((e) => e.appendChild(spriteEl(e.dataset.spr, 0, +e.dataset.sc * (HD.SKINS.some((k) => k.id === e.dataset.spr) ? HD.skinScale(e.dataset.spr) * 1.6 : 1))));
+    card.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { HD.audio.sfx.click(); shop(b.dataset.tab); }));
     card.querySelectorAll('.skin:not(.lockd)').forEach((b) => b.addEventListener('click', () => {
-      HD.save.skin = b.dataset.skin; persist(); HD.audio.sfx.click(); wardrobe(); refreshHome();
+      S.skin = b.dataset.skin; persist(); HD.audio.sfx.click(); shop(); refreshHome();
+    }));
+    card.querySelectorAll('[data-buy]').forEach((b) => b.addEventListener('click', () => {
+      const isPet = shopTab === 'pets', id = b.dataset.buy;
+      const it = (isPet ? HD.PETS : HD.ITEMS).find((x) => x.id === id);
+      if (S.wallet < it.cost) return;
+      S.wallet -= it.cost;
+      if (isPet) { S.pets[id] = 1; S.pet = id; } else { S.items[id] = 1; delete S.itemOff[id]; }
+      persist(); HD.audio.sfx.buy(); shop(); refreshHome();
+    }));
+    card.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.dataset.toggle;
+      if (shopTab === 'pets') S.pet = S.pet === id ? null : id;
+      else if (S.itemOff[id]) delete S.itemOff[id]; else S.itemOff[id] = 1;
+      persist(); HD.audio.sfx.click(); shop();
     }));
   }
 
@@ -304,7 +393,7 @@
   }
 
   // ---------- input ----------
-  const KEYS = { ArrowUp: 'up', KeyW: 'up', Space: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
+  const KEYS = { KeyE: 'spell', ShiftLeft: 'spell', ShiftRight: 'spell', ArrowUp: 'up', KeyW: 'up', Space: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
   window.addEventListener('keydown', (e) => {
     const inPlay = !$('#play').classList.contains('hidden');
     if (isOpen()) {
@@ -335,7 +424,9 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden) pauseMenu(); });
 
   $('#pauseBtn').addEventListener('click', pauseMenu);
-  $('#shopBtn').addEventListener('click', () => { HD.audio.init(); HD.audio.sfx.click(); wardrobe(); });
+  $('#shopBtn').addEventListener('click', () => { HD.audio.init(); HD.audio.sfx.click(); shop(); });
+  $('#spellBtn').addEventListener('click', (e) => { e.stopPropagation(); HD.game.input('spell'); });
+  $('#spellBtn').addEventListener('touchend', (e) => e.stopPropagation());
   $('#muteBtn').addEventListener('click', () => {
     HD.audio.init();
     HD.save.muted = !HD.save.muted; persist(); HD.audio.setMuted(HD.save.muted); refreshHome();

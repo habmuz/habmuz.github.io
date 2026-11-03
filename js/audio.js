@@ -56,6 +56,11 @@
     win() { [523, 523, 659, 784, 659, 784, 1047].forEach((f, i) => tone(f, i === 6 ? 0.6 : 0.14, 'square', 0.1, null, i * 0.12)); },
     unlock() { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.22, 'triangle', 0.14, null, i * 0.1)); },
     click() { tone(660, 0.05, 'square', 0.06); },
+    shield() { tone(1200, 0.25, 'sine', 0.15, 300); noise(0.2, 0.15, 5000); },
+    snap() { noise(0.06, 0.4, 8000); tone(1568, 0.12, 'square', 0.1, null, 0.05); tone(2093, 0.2, 'square', 0.08, null, 0.12); },
+    spell() { tone(300, 0.3, 'sawtooth', 0.1, 1800); noise(0.25, 0.12, 6000); },
+    howl() { tone(330, 0.9, 'triangle', 0.12, 520); tone(520, 0.6, 'triangle', 0.08, 300, 0.9); },
+    buy() { [523, 784, 1047].forEach((f, i) => tone(f, 0.14, 'square', 0.1, null, i * 0.07)); },
     hint() { tone(880, 0.1, 'triangle', 0.12); tone(1175, 0.16, 'triangle', 0.12, null, 0.1); },
   };
 

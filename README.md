@@ -11,7 +11,14 @@ A pixel-art runner through the floors of Hogwarts. Dodge falling stone, jump spi
 | ↓ / S | Slide (in mid-air: drop fast) |
 | Forward arrow | Dash (escape falling rocks) |
 | Back arrow | Turn around at the stairs and climb |
+| E / Shift | Cast Stupefy (once you own the wand) |
 | Esc / P | Pause |
+
+## Characters, accessories and pets
+- **22 wizards** unlock as your lifetime snitch count grows: Hogwarts friends, the whole Weasley family and the Death Eaters.
+- **Accessories** are bought with snitches from your wallet and protect you on every level: Sorting Hat (shield), Weasley Scarf (+1 heart), Gringotts Pouch, Time-Turner, Nimbus Broom (double jump) and the Stupefy Wand.
+- **Pets** follow you through the castle: Trevor, Scabbers, Crookshanks, Hedwig and Dobby, who saves you from one death per level.
+- Watch out for the **werewolf** charging down the corridors from level 15.
 
 On touch screens, swipe in the same directions (tap to jump).
 

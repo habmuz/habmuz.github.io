@@ -21,9 +21,9 @@
     { name: 'Charms Corridor',    wall: ['#5d5a52', '#4f4c45', '#69665d'], floor: '#867f71', decor: ['window', 'torch', 'armor', 'portrait'] },
     { name: 'Trophy Room',        wall: ['#4a3f2a', '#3c3322', '#574a31'], floor: '#7f6e46', decor: ['trophy', 'torch', 'banner', 'trophy'] },
     { name: 'Gryffindor Tower',   wall: ['#5a2f2a', '#4a2622', '#683832'], floor: '#7f4f3e', decor: ['banner', 'portrait', 'torch', 'window'] },
-    { name: 'Forbidden Corridor', wall: ['#3a3640', '#2f2c35', '#44404b'], floor: '#5a5662', decor: ['chains', 'torch', 'armor', 'chains'] },
+    { name: 'Forbidden Corridor', wall: ['#3a3640', '#2f2c35', '#44404b'], floor: '#5a5662', decor: ['chains', 'torch', 'armor', 'darkmark'] },
     { name: 'Astronomy Tower',    wall: ['#2e3550', '#262c44', '#373f5d'], floor: '#4e5676', decor: ['bigwindow', 'torch', 'bigwindow'] },
-    { name: 'Chamber of Secrets', wall: ['#203a2e', '#1a3026', '#264535'], floor: '#386249', decor: ['serpent', 'greentorch', 'column'] },
+    { name: 'Chamber of Secrets', wall: ['#203a2e', '#1a3026', '#264535'], floor: '#386249', decor: ['serpent', 'greentorch', 'column', 'darkmark'] },
   ];
 
   // Obstacle catalogue: hitbox width and altitude band (alt = height above floor).
@@ -34,6 +34,7 @@
     pumpkin:  { act: 'jump',  w: 22, a0: 0,  a1: 24 },
     rubble:   { act: 'jump',  w: 26, a0: 0,  a1: 20 },
     book:     { act: 'jump',  w: 34, a0: 0,  a1: 24, mv: 55 },
+    wolf:     { act: 'jump',  w: 54, a0: 0,  a1: 30, mv: 150 },
     gap:      { act: 'jump' },
     crow:     { act: 'slide', w: 54, a0: 28, a1: 60, mv: 85 },
     beam:     { act: 'slide', w: 24, a0: 28, a1: HD.CEIL },
@@ -89,6 +90,7 @@
     if (n >= 7) w.push(['beam', 1.6]);
     if (n >= 9) w.push(['flybooks', 1.6]);
     if (n >= 12) w.push(['troll', 1.2]);
+    if (n >= 15) w.push(['wolf', 1.4 + d]);
     let tot = 0; for (const [, x] of w) tot += x;
     let k = r() * tot;
     for (const [t, x] of w) { if ((k -= x) <= 0) return t; }

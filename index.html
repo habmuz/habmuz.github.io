@@ -132,13 +132,27 @@
   .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 8px; margin: 16px 0; text-align: left; }
   kbd { display: inline-block; min-width: 22px; padding: 4px; background: #f4e6b8; color: #3a2a14; border-bottom: 3px solid #7a6a4a; text-align: center; margin-right: 6px; font-family: var(--px); }
   .skins { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
-  .skin { background: var(--stone); border: 3px solid #000; padding: 8px 2px; color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 128px; justify-content: flex-end; }
+  .skin { background: var(--stone); border: 3px solid #000; padding: 8px 2px; color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 120px; justify-content: flex-end; }
+  .skin .skin-ico { display: flex; align-items: flex-end; min-height: 70px; }
   .skin.on { background: #2e6b3e; border-color: var(--green); }
   .skin.lockd .skin-ico { filter: brightness(0) drop-shadow(0 0 1px #6d6488); }
   .skin .nm { font-size: 6px; }
   .skin .cost { font-size: 6px; color: var(--gold); }
   @media (max-width: 420px) { .skins { grid-template-columns: repeat(2, 1fr); } .hero h1 { font-size: 22px; } }
 
+  #spellBtn { position: absolute; right: 2%; bottom: 4%; padding: 1.2% 2%; background: rgba(20,60,30,.75); border: 2px solid var(--green); color: var(--green); font-size: 9px; }
+  .tabs { display: flex; gap: 6px; justify-content: center; margin: 4px 0 12px; }
+  .tab { flex: 1; background: var(--stone); color: var(--muted); border: 3px solid #000; padding: 9px 4px; font-size: 8px; }
+  .tab.on { background: #c48b28; color: #fff; }
+  .house { font-size: 8px; color: var(--gold); text-align: left; margin: 14px 0 -6px; }
+  .goods { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+  .good { display: flex; align-items: center; gap: 10px; background: var(--stone); border: 3px solid #000; padding: 8px; text-align: left; }
+  .good.on { border-color: var(--green); background: #24402c; }
+  .good .skin-ico { width: 64px; display: flex; justify-content: center; flex-shrink: 0; }
+  .gtxt { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .gtxt b { font-size: 9px; } .gtxt span { font-size: 6px; line-height: 1.7; color: #cfc3e6; }
+  .shoplink { color: var(--green); }
+  #card { max-width: 520px; }
   #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
   #confetti i { position: absolute; top: -10px; width: 6px; height: 6px; animation: fall linear forwards; }
   @keyframes fall { to { transform: translateY(105vh) rotate(720deg); } }
@@ -149,7 +163,7 @@
   <div class="topbar">
     <div class="brand">HOGWARTS DASH</div>
     <div class="coins" title="Golden Snitches caught"><span class="ico" id="coinIco"></span><span id="coinCount">0</span></div>
-    <button class="tb-btn" id="shopBtn">WARDROBE</button>
+    <button class="tb-btn" id="shopBtn">SHOP</button>
     <button class="tb-btn" id="muteBtn">🔊</button>
   </div>
   <div id="map">
@@ -180,6 +194,7 @@
   <div id="stage">
     <canvas id="game" width="640" height="360"></canvas>
     <button id="pauseBtn" aria-label="Pause">II</button>
+    <button id="spellBtn" class="hidden">SPELL</button>
   </div>
 </div>
 
