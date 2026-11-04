@@ -42,12 +42,25 @@
   HD.PETS = [
     { id: 'toad', name: 'Trevor', cost: 120, desc: '+2 snitches at every checkpoint' },
     { id: 'scabbers', name: 'Scabbers', cost: 300, desc: 'Sniffs out snitches: small magnet' },
+    { id: 'ferret', name: 'Bouncing Ferret', cost: 450, desc: 'Springy! You jump 12% higher' },
     { id: 'crookshanks', name: 'Crookshanks', cost: 600, desc: 'Pounces on snitches: big magnet' },
     { id: 'owl', name: 'Hedwig', cost: 1000, desc: 'Swoops for half the snitches you miss' },
+    { id: 'snake', name: 'Serpent', cost: 1400, desc: 'Strikes the first book, wolf, crow or troll on every floor' },
     { id: 'dobby', name: 'Dobby', cost: 1800, desc: 'Once per level, snaps his fingers and saves you from death' },
+    { id: 'dragon', name: 'Baby Dragon', cost: 2600, desc: 'Breathes fire on the obstacle ahead every 12 seconds' },
+  ];
+  // Patronuses float beside you; double-click your wizard (or Q) to drive off dementors.
+  const pat = (id, name, cost, dur) => ({ id, spr: 'pat_' + id, name, cost, dur });
+  HD.PATRONI = [
+    pat('hare', 'Hare', 0, 4), pat('squirrel', 'Squirrel', 200, 4), pat('hedgehog', 'Hedgehog', 250, 4),
+    pat('dragonfly', 'Dragonfly', 300, 4), pat('cat', 'Cat', 350, 4), pat('snake', 'Serpent', 400, 4),
+    pat('fox', 'Fox', 600, 5), pat('otter', 'Otter', 700, 5), pat('swan', 'Swan', 750, 5), pat('dog', 'Terrier', 800, 5),
+    pat('badger', 'Badger', 850, 5), pat('owl', 'Owl', 900, 5), pat('dolphin', 'Dolphin', 950, 5), pat('horse', 'Horse', 1000, 5),
+    pat('doe', 'Doe', 1100, 5), pat('wolf', 'Wolf', 1400, 6), pat('bear', 'Bear', 1600, 6), pat('lion', 'Lion', 1800, 6),
+    pat('whale', 'Whale', 2000, 6), pat('stag', 'Stag', 2200, 6), pat('dragon', 'Dragon', 3000, 8), pat('phoenix', 'Phoenix', 3500, 8),
   ];
 
-  function defaults() { return { unlocked: 1, coins: 0, wallet: 0, skin: 'harry', stars: {}, chests: {}, muted: false, seen: {}, items: {}, itemOff: {}, pets: {}, pet: null }; }
+  function defaults() { return { unlocked: 1, coins: 0, wallet: 0, skin: 'harry', stars: {}, chests: {}, muted: false, seen: {}, items: {}, itemOff: {}, pets: {}, pet: null, patroni: { hare: 1 }, patronus: 'hare' }; }
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(SAVE_KEY));
@@ -61,6 +74,8 @@
   HD.loadout = () => {
     const o = { pet: HD.save.pet && HD.save.pets[HD.save.pet] ? HD.save.pet : null };
     for (const it of HD.ITEMS) o[it.id] = !!(HD.save.items[it.id] && !HD.save.itemOff[it.id]);
+    const pid = HD.save.patroni[HD.save.patronus] ? HD.save.patronus : 'hare';
+    o.patronus = HD.PATRONI.find((x) => x.id === pid);
     return o;
   };
 
@@ -264,6 +279,7 @@
   }
 
   HD.ui = {
+    persist,
     onLevelEnd(r) {
       const before = HD.SKINS.filter(owned).map((s) => s.id);
       const lo = HD.loadout();
@@ -315,7 +331,7 @@
     if (HD.game.state === 'off' || HD.game.state === 'over' || isOpen()) return;
     HD.game.setPaused(true);
     showOverlay(`<div class="title gold">PAUSED</div>
-      <div class="controls"><div><kbd>↑</kbd> Jump</div><div><kbd>↓</kbd> Slide</div><div><kbd>→</kbd> Dash forward</div><div><kbd>←</kbd> Turn at stairs</div>${HD.loadout().spell ? '<div><kbd>E</kbd> Stupefy</div>' : ''}</div>
+      <div class="controls"><div><kbd>↑</kbd> Jump</div><div><kbd>↓</kbd> Slide</div><div><kbd>→</kbd> Dash forward</div><div><kbd>←</kbd> Turn at stairs</div>${HD.loadout().spell ? '<div><kbd>E</kbd> Stupefy</div>' : ''}<div><kbd>Q</kbd> Patronus (or double-click your wizard)</div></div>
       <div class="btns"><button class="btn ghost" data-act="map">Map</button><button class="btn ghost" data-act="retry">Restart</button><button class="btn" data-act="resume">Resume</button></div>`,
     () => { hideOverlay(); HD.game.setPaused(false); }, goHome);
   }
@@ -324,7 +340,7 @@
   function shop(tab) {
     if (tab) shopTab = tab;
     const S = HD.save;
-    const tabs = [['wizards', 'Wizards'], ['items', 'Accessories'], ['pets', 'Pets']]
+    const tabs = [['wizards', 'Wizards'], ['items', 'Accessories'], ['pets', 'Pets'], ['patronus', 'Patronuses']]
       .map(([k, n]) => `<button class="tab ${shopTab === k ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('');
     let h = `<div class="title gold">SHOP</div><div class="tabs">${tabs}</div>`;
     if (shopTab === 'wizards') {
@@ -340,6 +356,16 @@
         h += `</div>`;
       }
       h += progressHTML();
+    } else if (shopTab === 'patronus') {
+      h += `<div class="sub">Your Patronus floats beside you. <b>Double-click your wizard</b> (or press Q) to drive off dementors · <b class="gold">${S.wallet.toLocaleString()}</b> to spend</div><div class="goods">`;
+      for (const it of HD.PATRONI) {
+        const has = S.patroni[it.id], on = HD.loadout().patronus.id === it.id, afford = S.wallet >= it.cost;
+        const btn = !has ? `<button class="btn small ${afford ? 'gold' : 'ghost'}" data-buy="${it.id}" ${afford ? '' : 'disabled'}>BUY ${it.cost.toLocaleString()}</button>`
+          : `<button class="btn small ${on ? '' : 'ghost'}" data-toggle="${it.id}" ${on ? 'disabled' : ''}>${on ? 'WITH YOU' : 'CHOOSE'}</button>`;
+        h += `<div class="good pat ${on ? 'on' : ''}"><span class="skin-ico" data-spr="${it.spr}" data-sc="1.1"></span>
+          <div class="gtxt"><b>${it.name}</b><span>Shields you for ${it.dur} seconds${it.cost ? '' : ' · free'}</span></div>${btn}</div>`;
+      }
+      h += `</div>`;
     } else {
       const list = shopTab === 'items' ? HD.ITEMS : HD.PETS;
       h += `<div class="sub">Spend snitches from your wallet · <b class="gold">${S.wallet.toLocaleString()}</b> to spend</div><div class="goods">`;
@@ -363,16 +389,18 @@
       S.skin = b.dataset.skin; persist(); HD.audio.sfx.click(); shop(); refreshHome();
     }));
     card.querySelectorAll('[data-buy]').forEach((b) => b.addEventListener('click', () => {
-      const isPet = shopTab === 'pets', id = b.dataset.buy;
-      const it = (isPet ? HD.PETS : HD.ITEMS).find((x) => x.id === id);
+      const isPet = shopTab === 'pets', isPat = shopTab === 'patronus', id = b.dataset.buy;
+      const it = (isPat ? HD.PATRONI : isPet ? HD.PETS : HD.ITEMS).find((x) => x.id === id);
       if (S.wallet < it.cost) return;
       S.wallet -= it.cost;
-      if (isPet) { S.pets[id] = 1; S.pet = id; } else { S.items[id] = 1; delete S.itemOff[id]; }
+      if (isPat) { S.patroni[id] = 1; S.patronus = id; }
+      else if (isPet) { S.pets[id] = 1; S.pet = id; } else { S.items[id] = 1; delete S.itemOff[id]; }
       persist(); HD.audio.sfx.buy(); shop(); refreshHome();
     }));
     card.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', () => {
       const id = b.dataset.toggle;
-      if (shopTab === 'pets') S.pet = S.pet === id ? null : id;
+      if (shopTab === 'patronus') S.patronus = id;
+      else if (shopTab === 'pets') S.pet = S.pet === id ? null : id;
       else if (S.itemOff[id]) delete S.itemOff[id]; else S.itemOff[id] = 1;
       persist(); HD.audio.sfx.click(); shop();
     }));
@@ -393,7 +421,7 @@
   }
 
   // ---------- input ----------
-  const KEYS = { KeyE: 'spell', ShiftLeft: 'spell', ShiftRight: 'spell', ArrowUp: 'up', KeyW: 'up', Space: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
+  const KEYS = { KeyQ: 'patronus', KeyE: 'spell', ShiftLeft: 'spell', ShiftRight: 'spell', ArrowUp: 'up', KeyW: 'up', Space: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
   window.addEventListener('keydown', (e) => {
     const inPlay = !$('#play').classList.contains('hidden');
     if (isOpen()) {
@@ -408,14 +436,26 @@
   });
 
   // swipe controls
-  let ts = null;
+  let ts = null, lastTap = 0;
   const stage = $('#stage');
+  const toCanvas = (x, y) => { const r = $('#game').getBoundingClientRect(); return [((x - r.left) / r.width) * 640, ((y - r.top) / r.height) * 360]; };
+  $('#game').addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    const c = toCanvas(e.clientX, e.clientY);
+    if (HD.game.nearPlayer(c[0], c[1])) HD.game.input('patronus');
+  });
   stage.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; ts = [t.clientX, t.clientY, performance.now()]; }, { passive: true });
   stage.addEventListener('touchend', (e) => {
     if (!ts) return;
     const t = e.changedTouches[0], dx = t.clientX - ts[0], dy = t.clientY - ts[1];
     ts = null;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) { HD.game.input('up'); return; }
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) {
+      // double-tap the wizard: Patronus; any other tap: jump
+      const c = toCanvas(t.clientX, t.clientY), on = HD.game.nearPlayer(c[0], c[1]), tn = performance.now();
+      if (on && tn - lastTap < 380) { lastTap = 0; HD.game.input('patronus'); return; }
+      lastTap = on ? tn : 0;
+      HD.game.input('up'); return;
+    }
     if (Math.abs(dx) > Math.abs(dy)) HD.game.input(dx > 0 ? 'right' : 'left');
     else HD.game.input(dy > 0 ? 'down' : 'up');
   }, { passive: true });

@@ -17,7 +17,8 @@ A pixel-art runner through the floors of Hogwarts. Dodge falling stone, jump spi
 ## Characters, accessories and pets
 - **22 wizards** unlock as your lifetime snitch count grows: Hogwarts friends, the whole Weasley family and the Death Eaters.
 - **Accessories** are bought with snitches from your wallet and protect you on every level: Sorting Hat (shield), Weasley Scarf (+1 heart), Gringotts Pouch, Time-Turner, Nimbus Broom (double jump) and the Stupefy Wand.
-- **Pets** follow you through the castle: Trevor, Scabbers, Crookshanks, Hedwig and Dobby, who saves you from one death per level.
+- **Pets** follow you through the castle: Trevor, Scabbers, the Bouncing Ferret, Crookshanks, Hedwig, the Serpent, Dobby and a Baby Dragon that breathes fire on obstacles.
+- **Patronuses** (22 of them, the Hare is free) float beside you. **Dementors** glide in from level 20 and can't be jumped or slid past: double-click your wizard (or press Q, or double-tap on a phone) to cast your Patronus and drive them off.
 - Watch out for the **werewolf** charging down the corridors from level 15.
 
 On touch screens, swipe in the same directions (tap to jump).

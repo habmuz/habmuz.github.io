@@ -41,10 +41,12 @@
     flybooks: { act: 'slide', w: 32, a0: 28, a1: 92 },
     troll:    { act: 'slide', w: 40, a0: 28, a1: 86 },
     debris:   { act: 'dash',  w: 28 },
+    dementor: { act: 'patronus', w: 36, a0: 0, a1: HD.CEIL, mv: 70 },
   };
 
   // Level -> which move gets introduced (tutorial freeze-frame the first time).
-  HD.TUTORIAL = { 1: 'jump', 2: 'slide', 3: 'turn', 4: 'dash' };
+  HD.TUTORIAL = { 1: 'jump', 2: 'slide', 3: 'turn', 4: 'dash', 20: 'patronus' };
+  HD.DEMENTOR_FROM = 20;
 
   function rng(seed) {
     return function () {
@@ -91,6 +93,7 @@
     if (n >= 9) w.push(['flybooks', 1.6]);
     if (n >= 12) w.push(['troll', 1.2]);
     if (n >= 15) w.push(['wolf', 1.4 + d]);
+    if (n >= HD.DEMENTOR_FROM) w.push(['dementor', 0.9 + d]);
     let tot = 0; for (const [, x] of w) tot += x;
     let k = r() * tot;
     for (const [t, x] of w) { if ((k -= x) <= 0) return t; }
@@ -128,7 +131,8 @@
     for (const c of L.cps) { c.reached = false; c.t = 0; }
 
     // Obstacles.
-    let tutPlaced = !(tut === 'jump' || tut === 'slide' || tut === 'dash');
+    let tutPlaced = !(tut === 'jump' || tut === 'slide' || tut === 'dash' || tut === 'patronus');
+    let lastDem = -1e9; // dementors stay ~10s apart so the Patronus can recharge
     const cand = []; // snitch candidates {f,u,alt}
     for (const fl of L.floors) {
       const start = fl.f === 0 ? s * 2.0 : s * 1.3;
@@ -142,14 +146,21 @@
         if (blocked !== undefined) { u = blocked + s * 1.1 + 10; continue; }
 
         let force = null;
-        if (!tutPlaced) force = tut === 'jump' ? 'spikes' : tut === 'slide' ? 'crow' : 'debris';
+        if (!tutPlaced) force = tut === 'jump' ? 'spikes' : tut === 'slide' ? 'crow' : tut === 'patronus' ? 'dementor' : 'debris';
         let type = pickType(n, d, r, force);
+        const su = fl.sOff + u;
+        if (type === 'dementor' && !force && su - lastDem < s * 10) type = 'crow';
         const group = [];
         group.push(type);
-        // combos on harder levels
-        if (!force && n >= 15 && r() < d * 0.55) {
+        if (type === 'dementor') {
+          lastDem = su;
+          // a swarm on later levels; one Patronus drives them all off
+          const swarm = n >= 150 ? 3 : n >= 60 ? 2 : 1;
+          for (let k = 1; k < swarm && r() < 0.5 + d * 0.4; k++) group.push('dementor');
+        } else if (!force && n >= 15 && r() < d * 0.55) {
+          // combos on harder levels
           const second = pickType(n, d, r);
-          if (second !== 'debris' && type !== 'debris') group.push(second);
+          if (second !== 'debris' && second !== 'dementor' && type !== 'debris') group.push(second);
         }
         let gu = u;
         for (let gi = 0; gi < group.length; gi++) {
@@ -177,7 +188,7 @@
           if (gi < group.length - 1) {
             const nxt = group[gi + 1];
             const jj = T.act === 'jump' && HD.TYPES[nxt].act === 'jump';
-            gu += s * (jj ? 1.1 : 0.95) + (o.w || 0);
+            gu += t === 'dementor' ? 90 : s * (jj ? 1.1 : 0.95) + (o.w || 0);
           }
         }
         // a line of snitches on the runway before this obstacle

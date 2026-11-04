@@ -61,6 +61,10 @@
     spell() { tone(300, 0.3, 'sawtooth', 0.1, 1800); noise(0.25, 0.12, 6000); },
     howl() { tone(330, 0.9, 'triangle', 0.12, 520); tone(520, 0.6, 'triangle', 0.08, 300, 0.9); },
     buy() { [523, 784, 1047].forEach((f, i) => tone(f, 0.14, 'square', 0.1, null, i * 0.07)); },
+    patronus() { [659, 784, 988, 1319, 1568].forEach((f, i) => tone(f, 0.5, 'sine', 0.1, null, i * 0.06)); noise(0.5, 0.08, 9000); },
+    dementor() { tone(180, 1.2, 'sawtooth', 0.05, 90); noise(1.0, 0.12, 400); },
+    hiss() { noise(0.35, 0.25, 7000); },
+    fire() { noise(0.6, 0.35, 1600); tone(120, 0.5, 'sawtooth', 0.08, 60); },
     hint() { tone(880, 0.1, 'triangle', 0.12); tone(1175, 0.16, 'triangle', 0.12, null, 0.1); },
   };
 

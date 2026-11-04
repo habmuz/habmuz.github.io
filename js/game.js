@@ -16,11 +16,13 @@
   const A = window.ATLAS;
 
   let L = null, P = null, p = null, state = 'off', lives = 0, got = 0, maxLives = 3, bonus = 0;
-  let LO = {}, pet = null, bolts = [], hedwigFlip = false;
+  let LO = {}, pet = null, bolts = [], hedwigFlip = false, patron = null, chill = 0;
   let camX = 0, camY = 0, shake = 0, gtime = 0, stateT = 0, freeze = null, deathReason = '';
   let particles = [], popups = [], skin = 'harry', raf = 0, last = 0;
-  const buf = { jump: -9, slide: -9, fwd: -9, back: -9, spell: -9 };
-  const SPELL_CD = 8;
+  const buf = { jump: -9, slide: -9, fwd: -9, back: -9, spell: -9, patronus: -9 };
+  const SPELL_CD = 8, PAT_CD = 9, FIRE_CD = 12;
+  const SNAKE_EATS = { book: 1, wolf: 1, crow: 1, troll: 1 };
+  const jumpV = () => JUMPV * (LO.pet === 'ferret' ? 1.12 : 1);
   const fallT = () => FALLT * (LO.timeturner ? 1.35 : 1);
   const dashCd = () => DASH_CD * (LO.timeturner ? 0.5 : 1);
   const BUF_T = 0.18;
@@ -109,8 +111,14 @@
     LO = HD.loadout ? HD.loadout() : {};
     maxLives = P.lives + (LO.scarf ? 1 : 0); lives = maxLives; got = 0; bonus = 0; bolts = [];
     skin = HD.save.skin;
-    p = { f: 0, u: 0, alt: 0, vy: 0, ground: true, slide: 0, dash: 0, dashCd: 0, climb: null, inv: 0, anim: 0, pendSlide: false, coyote: 0, scale: HD.skinScale(skin), shield: LO.hat ? 1 : 0, dobby: LO.pet === 'dobby' ? 1 : 0, spellCd: 0, dj: false };
+    p = { f: 0, u: 0, alt: 0, vy: 0, ground: true, slide: 0, dash: 0, dashCd: 0, climb: null, inv: 0, anim: 0, pendSlide: false, coyote: 0, scale: HD.skinScale(skin), shield: LO.hat ? 1 : 0, dobby: LO.pet === 'dobby' ? 1 : 0, spellCd: 0, dj: false, patT: 0, patCd: 0, fireCd: 3 };
     pet = LO.pet ? { id: LO.pet, x: wx(L.floors[0], 0) - 30, y: gy(0), hop: 0 } : null;
+    patron = LO.patronus ? { id: LO.patronus.id, dur: LO.patronus.dur, x: wx(L.floors[0], 0) - 34, y: gy(0) - 50 } : null;
+    // first dementor a player ever meets gets the double-click tutorial
+    if (n >= HD.DEMENTOR_FROM && !(HD.save.seen && HD.save.seen.dementor)) {
+      const first = [].concat(...L.floors.map((fl) => fl.obs)).find((o) => o.type === 'dementor');
+      if (first) first.tut = 'patronus';
+    }
     for (const k in buf) buf[k] = -9;
     particles = []; popups = []; freeze = null; shake = 0;
     state = 'intro'; stateT = 0; gtime = 0;
@@ -134,6 +142,15 @@
     if (!p || state === 'off' || state === 'paused') return;
     const t = now();
     if (k === 'spell') { if (LO.spell) buf.spell = t; return; }
+    if (k === 'patronus') {
+      if (!patron) return;
+      buf.patronus = t;
+      if (freeze && freeze.need === 'patronus') {
+        freeze.obj.tutDone = true; freeze = null;
+        HD.save.seen.dementor = 1; HD.ui.persist();
+      }
+      return;
+    }
     if (k === 'up') buf.jump = t;
     else if (k === 'down') buf.slide = t;
     else {
@@ -197,14 +214,15 @@
     let cp = { f: 0, u: 0 };
     for (const c of L.cps) if (c.reached) cp = c;
     for (const fl of L.floors) if (fl.f >= cp.f) for (const o of fl.obs) {
-      o.u = o.u0; o.active = false; o.st = null; o.t = 0; o.landed = false; o.dead = false; o.howled = false;
+      o.u = o.u0; o.active = false; o.st = null; o.t = 0; o.landed = false; o.dead = false; o.howled = false; o.flee = false;
     }
+    for (const fl of L.floors) if (fl.f >= cp.f) fl.snaked = false;
     for (const sn of L.snitches) {
       if (sn.got && !sn.banked) { sn.got = false; got--; }
       if (!sn.got) { sn.missed = false; if (sn.u0 !== undefined) { sn.u = sn.u0; sn.alt = sn.a0; } }
     }
     bolts = [];
-    Object.assign(p, { f: cp.f, u: cp.u, alt: 0, vy: 0, ground: true, slide: 0, dash: 0, dashCd: 0, climb: null, inv: 1.6, pendSlide: false, dj: false });
+    Object.assign(p, { f: cp.f, u: cp.u, alt: 0, vy: 0, ground: true, slide: 0, dash: 0, dashCd: 0, climb: null, inv: 1.6, pendSlide: false, dj: false, patT: 0, patCd: 0 });
     for (const k in buf) buf[k] = -9;
     const fl = floorOf(p.f);
     camX = wx(fl, p.u) - (fl.dir > 0 ? 190 : W - 190); camY = gy(p.f) - GSY;
@@ -240,7 +258,11 @@
     p.inv = Math.max(0, p.inv - dt);
     p.dashCd = Math.max(0, p.dashCd - dt);
     p.spellCd = Math.max(0, p.spellCd - dt);
+    p.patCd = Math.max(0, p.patCd - dt);
+    p.patT = Math.max(0, p.patT - dt);
+    p.fireCd = Math.max(0, p.fireCd - dt);
     updatePet(dt);
+    updatePatron(dt);
     p.dash = Math.max(0, p.dash - dt);
 
     // climbing the staircase to the next floor
@@ -261,11 +283,11 @@
       consume('fwd'); p.dash = DASH_T; p.dashCd = dashCd(); HD.audio.sfx.dash();
     }
     if (fresh('jump') && (p.ground || p.coyote > 0)) {
-      consume('jump'); p.vy = JUMPV; p.ground = false; p.coyote = 0; p.slide = 0; p.pendSlide = false;
+      consume('jump'); p.vy = jumpV(); p.ground = false; p.coyote = 0; p.slide = 0; p.pendSlide = false;
       HD.audio.sfx.jump();
       puff(wx(fl, p.u), gy(p.f), 5, '#b9a98c', 50, 100, 0.35);
     } else if (fresh('jump') && LO.broom && !p.ground && !p.dj) {
-      consume('jump'); p.vy = JUMPV * 0.85; p.dj = true; p.slide = 0; p.pendSlide = false;
+      consume('jump'); p.vy = jumpV() * 0.85; p.dj = true; p.slide = 0; p.pendSlide = false;
       HD.audio.sfx.jump();
       puff(wx(fl, p.u), gy(p.f) - p.alt, 10, '#d9b36a', 70, 60, 0.4);
     }
@@ -274,6 +296,12 @@
       bolts.push({ f: p.f, u: p.u + 14, start: p.u });
     }
     updateBolts(fl, dt);
+    if (fresh('patronus') && patron && p.patCd <= 0) {
+      consume('patronus'); p.patT = patron.dur; p.patCd = PAT_CD; HD.audio.sfx.patronus();
+      const [px, py] = playerWorld();
+      puff(px, py - 30, 30, '#dff1ff', 150, 0, 0.8, 2);
+      popup(px, py - 70, 'EXPECTO PATRONUM!', '#cfeaff', 8);
+    }
     if (fresh('slide')) {
       consume('slide');
       if (p.ground) { p.slide = SLIDE_T; HD.audio.sfx.slide(); }
@@ -326,14 +354,44 @@
 
     // obstacles
     const pr = pRect();
+    chill = 0;
     for (const o of fl.obs) {
       if (o.dead) continue;
       const T = TYPES[o.type];
       const dist = o.u - p.u;
+      if (o.type === 'dementor') {
+        if (o.flee) { o.ft += dt; o.u += 240 * dt; if (o.ft > 1.2) o.dead = true; continue; }
+        if (p.patT > 0 && dist < 320 && dist > -40) {
+          o.flee = true; o.ft = 0;
+          const x = wx(fl, o.u), y = gy(p.f) - 40;
+          puff(x, y, 22, '#dff1ff', 120, -40, 0.8, 2); popup(x, y - 30, 'BEGONE!', '#cfeaff', 7);
+          continue;
+        }
+        if (dist > -20 && dist < 320) chill = Math.max(chill, 1 - Math.max(0, dist) / 320);
+      }
+      // pets that fight
+      if (LO.pet === 'snake' && !fl.snaked && SNAKE_EATS[o.type] && dist > 0 && dist < 70) {
+        o.dead = true; fl.snaked = true; if (pet) pet.swoop = 0.6;
+        const x = wx(fl, o.u), y = gy(p.f) - 24;
+        HD.audio.sfx.hiss(); puff(x, y, 18, '#9fbf6a', 120, 160, 0.6, 2); popup(x, y - 24, 'HISSS!', '#b5e27a', 8);
+        continue;
+      }
+      if (LO.pet === 'dragon' && p.fireCd <= 0 && o.type !== 'gap' && o.type !== 'dementor' && dist > 50 && dist < 170 && (o.type !== 'debris' || o.st === 'fall')) {
+        o.dead = true; p.fireCd = FIRE_CD; if (pet) pet.swoop = 0.6;
+        const x = wx(fl, o.u), y = gy(p.f) - 24;
+        HD.audio.sfx.fire(); shake = Math.max(shake, 4);
+        for (let i = 0; i < 26; i++) {
+          const k = i / 26;
+          particles.push({ x: pet ? pet.x + (x - pet.x) * k : x, y: (pet ? pet.y - 20 : y) + (y - (pet ? pet.y - 20 : y)) * k + (Math.random() - 0.5) * 10, vx: (Math.random() - 0.5) * 40, vy: -30 - Math.random() * 40, g: 0, life: 0.5 + k * 0.3, t: 0, c: ['#ffdf6b', '#ff8a2b', '#ff4d2e'][i % 3], s: 3 });
+        }
+        puff(x, y, 26, '#ff8a2b', 140, -60, 0.7, 3); popup(x, y - 26, 'INCENDIO!', '#ffb36b', 6);
+        continue;
+      }
       if (T.mv) {
         if (!o.active && dist < 560) o.active = true;
         if (o.active) o.u -= T.mv * dt;
         if (o.type === 'wolf' && o.active && !o.howled) { o.howled = true; HD.audio.sfx.howl(); }
+        if (o.type === 'dementor' && o.active && !o.howled) { o.howled = true; HD.audio.sfx.dementor(); }
       }
       if (o.type === 'debris') {
         if (!o.st && dist < o.trig && dist > -20) {
@@ -359,7 +417,7 @@
       }
       // tutorial freeze-frames
       if (o.tut && !o.tutDone && dist > 0) {
-        const trig = T.act === 'jump' ? P.speed * 0.4 : (T.w / 2 + HALF_W + (T.mv ? 34 : 8 + P.speed * 0.08));
+        const trig = T.act === 'jump' ? P.speed * 0.4 : T.act === 'patronus' ? 230 : (T.w / 2 + HALF_W + (T.mv ? 34 : 8 + P.speed * 0.08));
         if (dist <= trig) { freeze = { need: T.act, obj: o }; HD.audio.sfx.hint(); return; }
       }
       if (Math.abs(dist) > 120) continue;
@@ -448,7 +506,7 @@
     for (const b of bolts) {
       b.u += 640 * dt;
       for (const o of fl.obs) {
-        if (o.dead || o.type === 'gap' || Math.abs(o.u - b.u) > 22) continue;
+        if (o.dead || o.type === 'gap' || o.type === 'dementor' || Math.abs(o.u - b.u) > 22) continue;
         if (o.type === 'debris' && !o.st) continue; // nothing to hit until it falls
         o.dead = true; b.done = true;
         const x = wx(fl, o.u), y = gy(p.f) - 30;
@@ -480,6 +538,25 @@
     pet.hop = (pet.hop + dt * 9) % (Math.PI * 2);
     if (pet.swoop) pet.swoop = Math.max(0, pet.swoop - dt);
   }
+  function updatePatron(dt) {
+    if (!patron) return;
+    const [x, y] = playerWorld();
+    const dir = p.climb ? p.climb.dir : floorOf(p.f).dir;
+    const on = p.patT > 0;
+    const tx = x + dir * (on ? 74 : -36), ty = y - (on ? 34 : 54) + Math.sin(gtime * 2.6) * 5;
+    patron.x += (tx - patron.x) * Math.min(1, dt * (on ? 7 : 4));
+    patron.y += (ty - patron.y) * Math.min(1, dt * 4);
+    patron.dir = dir;
+    if (on && Math.random() < 0.5) particles.push({ x: patron.x + (Math.random() - 0.5) * 30, y: patron.y - Math.random() * 30, vx: -dir * 30, vy: -10, g: 0, life: 0.6, t: 0, c: 'rgba(220,240,255,0.8)', s: 2 });
+  }
+  function drawPatron(front) {
+    if (!patron || state === 'off' || (state === 'over' && L.reported)) return;
+    const on = p.patT > 0;
+    if (front !== on) return;
+    const a = on ? Math.min(1, p.patT * 2) : p.patCd > 0 ? 0.18 : 0.5 + Math.sin(gtime * 3) * 0.1;
+    glow(patron.x, patron.y - 18, on ? 60 : 30, 'rgba(190,225,255,A)', on ? 0.45 : a * 0.35);
+    spr('pat_' + patron.id, 0, patron.x, patron.y, patron.dir < 0, on ? 1.15 : 0.8, a);
+  }
   function drawPet(behind) {
     if (!pet || state === 'off' || (state === 'over' && L.reported)) return;
     if (behind !== (pet.id !== 'owl')) return;
@@ -488,7 +565,8 @@
     const sw = pet.swoop ? Math.sin(pet.swoop * 10) * 6 : 0;
     const frame = pet.id === 'toad' ? (hop > 4 ? 1 : 0) : 0;
     const sc = pet.id === 'toad' ? 0.6 : 1;
-    spr(pet.id, frame, pet.x, pet.y - hop + sw, flip, sc);
+    const lunge = pet.swoop && (pet.id === 'snake' || pet.id === 'dragon') ? Math.sin(pet.swoop * 5) * 14 * pet.dir : 0;
+    spr(pet.id, frame, pet.x + lunge, pet.y - hop + (lunge ? 0 : sw), flip, sc);
   }
 
   // ---------- rendering ----------
@@ -701,6 +779,7 @@
     ctx.fillStyle = '#3a2a14'; ctx.beginPath();
     const a = 5 * s;
     const pts = { up: [[0, -a], [a, a * 0.6], [-a, a * 0.6]], down: [[0, a], [a, -a * 0.6], [-a, -a * 0.6]], left: [[-a, 0], [a * 0.6, -a], [a * 0.6, a]], right: [[a, 0], [-a * 0.6, -a], [-a * 0.6, a]] }[dir];
+    if (!pts) { text(dir.toUpperCase(), x, y - s, Math.round(9 * s), '#3a2a14', 'center', false); return; }
     ctx.moveTo(x + pts[0][0], y - s + pts[0][1]); ctx.lineTo(x + pts[1][0], y - s + pts[1][1]); ctx.lineTo(x + pts[2][0], y - s + pts[2][1]); ctx.fill();
   }
 
@@ -761,6 +840,19 @@
         const lope = o.active ? Math.abs(Math.sin(gtime * 14)) * 5 : 0;
         spr('wolf', 0, x, g + 1 - lope, towards, 1);
         if (o.active && Math.random() < 0.3) puff(x + (towards ? 26 : -26), g - 2, 1, '#8d8577', 30, 50, 0.3);
+        break;
+      }
+      case 'dementor': {
+        const fr = Math.floor(gtime * 5 + o.u) % 4, hov = Math.sin(gtime * 3 + o.u) * 4;
+        if (o.flee) {
+          const k = Math.min(1, o.ft / 1.2);
+          spr('dementor', fr, x, g - 10 - hov - k * 150, !towards, 1, 1 - k);
+        } else {
+          ctx.fillStyle = 'rgba(0,0,0,0.3)';
+          ctx.beginPath(); ctx.ellipse(x, g - 1, 20, 4, 0, 0, Math.PI * 2); ctx.fill();
+          spr('dementor', fr, x, g - 10 - hov, towards, 1, 0.95);
+          if (Math.random() < 0.25) particles.push({ x: x + (Math.random() - 0.5) * 40, y: g - 12 - Math.random() * 50, vx: (towards ? 1 : -1) * 20, vy: 8, g: 0, life: 0.8, t: 0, c: 'rgba(120,140,170,0.6)', s: 2 });
+        }
         break;
       }
       case 'crow': spr('crow', Math.floor(gtime * 6), x, g - 30, towards, 0.66); break;
@@ -907,6 +999,13 @@
       rect(ix + 4, H - 16, 52, 8, 'rgba(0,0,0,0.5)');
       rect(ix + 5, H - 15, 50 * sk, 6, sk >= 1 ? '#7dff9a' : '#3f7a4c');
       text('SPELL [E]', ix + 30, H - 24, 6, sk >= 1 ? '#7dff9a' : '#8a7f99', 'center');
+      ix += 62;
+    }
+    if (patron) {
+      const pk = p.patT > 0 ? 1 : 1 - p.patCd / PAT_CD, rdy = p.patCd <= 0;
+      rect(ix + 4, H - 16, 64, 8, 'rgba(0,0,0,0.5)');
+      rect(ix + 5, H - 15, 62 * pk, 6, rdy || p.patT > 0 ? '#cfeaff' : '#4d6a86');
+      text('PATRONUS [Q]', ix + 36, H - 24, 6, rdy ? '#cfeaff' : '#8a7f99', 'center');
     }
     // dash meter
     const dk = 1 - p.dashCd / dashCd();
@@ -934,12 +1033,14 @@
     beam: ['THWACK!', 'down', 'Slide under the banners'],
     flybooks: ['WHACK!', 'down', 'Slide under the flying books'],
     troll: ['CLUBBED!', 'down', 'Slide between the troll\'s legs'],
+    dementor: ['KISSED!', 'q', 'Double-click your wizard (or Q) for a Patronus'],
   };
   const HINTS = {
     jump: ['up', 'Press UP to JUMP!'],
     slide: ['down', 'Press DOWN to SLIDE!'],
     dash: ['forward', 'Rocks falling! FORWARD to DASH!'],
     turn: ['back', 'Wall ahead! BACK to turn & climb'],
+    patronus: ['q', 'DEMENTOR! Double-click your wizard (or Q)'],
   };
   function keyDir(k) {
     const dir = p.climb ? p.climb.dir : floorOf(p.f).dir;
@@ -1002,9 +1103,11 @@
       if (x > cx - 100 && x < cx + W + 100) drawObstacle(fl, o);
     }
     for (const sn of L.snitches) if (sn.f >= fmin && sn.f <= fmax) drawSnitch(floorOf(sn.f), sn);
+    drawPatron(false);
     drawPet(true);
     drawPlayer();
     drawPet(false);
+    drawPatron(true);
     drawBolts();
     for (const q of particles) rect(q.x, q.y, q.s, q.s, q.c);
     for (const q of popups) {
@@ -1014,6 +1117,7 @@
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(vignette, 0, 0);
+    if (chill > 0 && state === 'play') rect(0, 0, W, H, `rgba(120,160,220,${(chill * 0.22).toFixed(3)})`);
     drawHUD();
     drawOverlays();
   }
@@ -1029,5 +1133,11 @@
     if (state !== 'off') render();
   }
 
-  HD.game = { start, stop, input, setPaused, get state() { return state; }, get level() { return L && L.n; }, get dbg() { return { L, p, state, lives, got, freeze }; } };
+  // canvas-space point (0..640, 0..360) on or near the wizard?
+  function nearPlayer(cx, cy) {
+    if (!p || state === 'off') return false;
+    const [x, y] = playerWorld(), sx = x - camX, sy = y - camY;
+    return Math.abs(cx - sx) < 40 && cy > sy - 80 && cy < sy + 16;
+  }
+  HD.game = { start, stop, input, setPaused, nearPlayer, get state() { return state; }, get level() { return L && L.n; }, get dbg() { return { L, p, state, lives, got, freeze }; } };
 })();
